@@ -63,7 +63,7 @@ export class MoveSupport<TElem extends Widget> extends EventEmitter {
       // If MoveSupport is created again for an already dragged element, do nothing. This makes sure the placeholder element cannot be dragged if clone is released and drag started right again
       return;
     }
-    if (!event || !elements || !elements.length || !draggedElement || !draggedElement.$container) {
+    if (!event || !elements || !draggedElement || !elements.includes(draggedElement) || !draggedElement.$container) {
       return;
     }
 
