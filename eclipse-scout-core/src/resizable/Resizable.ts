@@ -39,7 +39,7 @@ export class Resizable implements ResizableModel, ObjectWithType {
   protected _context: ResizableContext;
   protected _mouseDownHandler: (event: MouseDownEvent) => void;
   protected _mouseUpHandler: (event: MouseUpEvent) => void;
-  protected _mousemoveHandler: (event: MouseMoveEvent) => void;
+  protected _mouseMoveHandler: (event: MouseMoveEvent) => void;
   protected _resizeHandler: (newBounds: Rectangle) => void;
 
   constructor(model: InitModelOf<Resizable>) {
@@ -62,7 +62,7 @@ export class Resizable implements ResizableModel, ObjectWithType {
 
     this._mouseDownHandler = this._onMouseDown.bind(this);
     this._mouseUpHandler = this._onMouseUp.bind(this);
-    this._mousemoveHandler = this._onMousemove.bind(this);
+    this._mouseMoveHandler = this._onMouseMove.bind(this);
     this._resizeHandler = this._resize.bind(this);
   }
 
@@ -105,58 +105,32 @@ export class Resizable implements ResizableModel, ObjectWithType {
   }
 
   protected _appendResizeHandles() {
-    this.$resizableS = this.$container.appendDiv('resizable-handle resizable-s')
-      .data('edge', 's')
-      .on('mousedown.resizable', this._mouseDownHandler);
-    this.$resizableE = this.$container.appendDiv('resizable-handle resizable-e')
-      .data('edge', 'e')
-      .on('mousedown.resizable', this._mouseDownHandler);
-    this.$resizableSE = this.$container.appendDiv('resizable-handle resizable-se')
-      .data('edge', 'se')
-      .on('mousedown.resizable', this._mouseDownHandler);
-    this.$resizableW = this.$container.appendDiv('resizable-handle resizable-w')
-      .data('edge', 'w')
-      .on('mousedown.resizable', this._mouseDownHandler);
-    this.$resizableSW = this.$container.appendDiv('resizable-handle resizable-sw')
-      .data('edge', 'sw')
-      .on('mousedown.resizable', this._mouseDownHandler);
-    this.$resizableN = this.$container.appendDiv('resizable-handle resizable-n')
-      .data('edge', 'n')
-      .on('mousedown.resizable', this._mouseDownHandler);
-    this.$resizableNW = this.$container.appendDiv('resizable-handle resizable-nw')
-      .data('edge', 'nw')
-      .on('mousedown.resizable', this._mouseDownHandler);
-    this.$resizableNE = this.$container.appendDiv('resizable-handle resizable-ne')
-      .data('edge', 'ne')
-      .on('mousedown.resizable', this._mouseDownHandler);
+    this.$resizableS = this._appendResizeHandle('s');
+    this.$resizableE = this._appendResizeHandle('e');
+    this.$resizableSE = this._appendResizeHandle('se');
+    this.$resizableW = this._appendResizeHandle('w');
+    this.$resizableSW = this._appendResizeHandle('sw');
+    this.$resizableN = this._appendResizeHandle('n');
+    this.$resizableNW = this._appendResizeHandle('nw');
+    this.$resizableNE = this._appendResizeHandle('ne');
     this._calculateResizeHandlersVisibility();
   }
 
+  protected _appendResizeHandle(edge: ResizableEdge): JQuery {
+    return this.$container.appendDiv(`resizable-handle resizable-${edge}`)
+      .data('edge', edge)
+      .on('mousedown', this._mouseDownHandler);
+  }
+
   protected _calculateResizeHandlersVisibility() {
-    if (this.$resizableS) {
-      this.$resizableS.setVisible(this._hasMode(Resizable.MODES.SOUTH));
-    }
-    if (this.$resizableE) {
-      this.$resizableE.setVisible(this._hasMode(Resizable.MODES.EAST));
-    }
-    if (this.$resizableSE) {
-      this.$resizableSE.setVisible(this._hasMode(Resizable.MODES.SOUTH) && this._hasMode(Resizable.MODES.EAST));
-    }
-    if (this.$resizableW) {
-      this.$resizableW.setVisible(this._hasMode(Resizable.MODES.WEST));
-    }
-    if (this.$resizableSW) {
-      this.$resizableSW.setVisible(this._hasMode(Resizable.MODES.SOUTH) && this._hasMode(Resizable.MODES.WEST));
-    }
-    if (this.$resizableN) {
-      this.$resizableN.setVisible(this._hasMode(Resizable.MODES.NORTH));
-    }
-    if (this.$resizableNW) {
-      this.$resizableNW.setVisible(this._hasMode(Resizable.MODES.NORTH) && this._hasMode(Resizable.MODES.WEST));
-    }
-    if (this.$resizableNE) {
-      this.$resizableNE.setVisible(this._hasMode(Resizable.MODES.NORTH) && this._hasMode(Resizable.MODES.EAST));
-    }
+    this.$resizableS?.setVisible(this._hasMode(Resizable.MODES.SOUTH));
+    this.$resizableE?.setVisible(this._hasMode(Resizable.MODES.EAST));
+    this.$resizableSE?.setVisible(this._hasMode(Resizable.MODES.SOUTH) && this._hasMode(Resizable.MODES.EAST));
+    this.$resizableW?.setVisible(this._hasMode(Resizable.MODES.WEST));
+    this.$resizableSW?.setVisible(this._hasMode(Resizable.MODES.SOUTH) && this._hasMode(Resizable.MODES.WEST));
+    this.$resizableN?.setVisible(this._hasMode(Resizable.MODES.NORTH));
+    this.$resizableNW?.setVisible(this._hasMode(Resizable.MODES.NORTH) && this._hasMode(Resizable.MODES.WEST));
+    this.$resizableNE?.setVisible(this._hasMode(Resizable.MODES.NORTH) && this._hasMode(Resizable.MODES.EAST));
   }
 
   protected _hasMode(mode: ResizableMode): boolean {
@@ -206,12 +180,7 @@ export class Resizable implements ResizableModel, ObjectWithType {
       this.$resizableNE.remove();
       this.$resizableNE = null;
     }
-    if (this.$container) {
-      this.$container.removeClass('resizable');
-    }
-    this.$window
-      .off('mouseup.resizable', this._mouseUpHandler)
-      .off('mousemove.resizable', this._mousemoveHandler);
+    this._cleanup();
   }
 
   protected _onMouseDown(event: MouseDownEvent) {
@@ -255,28 +224,36 @@ export class Resizable implements ResizableModel, ObjectWithType {
 
     $resizable.addClass('resizing');
     this.$window
-      .off('mouseup.resizable', this._mouseUpHandler)
-      .off('mousemove.resizable', this._mousemoveHandler)
-      .on('mouseup.resizable', this._mouseUpHandler)
-      .on('mousemove.resizable', this._mousemoveHandler);
+      .off('mouseup', this._mouseUpHandler)
+      .off('mousemove', this._mouseMoveHandler)
+      .on('mouseup', this._mouseUpHandler)
+      .on('mousemove', this._mouseMoveHandler)
+      .body().addClass(`${this._context.edge}-resize`);
     $('iframe').addClass('dragging-in-progress');
   }
 
   protected _onMouseUp(event: MouseUpEvent) {
-    this.$container.removeClass('resizing');
+    this._cleanup();
+    this._resizeEnd();
+    this._context = null;
+  }
+
+  protected _cleanup() {
+    this.$container?.removeClass('resizing');
     if (this.$resizingOverlay) {
       this.$resizingOverlay.remove();
       this.$resizingOverlay = null;
     }
     this.$window
-      .off('mouseup.resizable', this._mouseUpHandler)
-      .off('mousemove.resizable', this._mousemoveHandler);
+      .off('mouseup', this._mouseUpHandler)
+      .off('mousemove', this._mouseMoveHandler);
+    if (this._context) {
+      this.$window.body().removeClass(`${this._context.edge}-resize`);
+    }
     $('iframe').removeClass('dragging-in-progress');
-    this._resizeEnd();
-    this._context = null;
   }
 
-  protected _onMousemove(event: MouseMoveEvent) {
+  protected _onMouseMove(event: MouseMoveEvent) {
     let newBounds = this._computeBounds(event);
     if (newBounds) {
       $.throttle(this._resizeHandler, Resizable.FPS)(newBounds);
@@ -366,8 +343,9 @@ export interface ResizableContext {
   minBounds: Rectangle;
   maxBounds: Rectangle;
   distance: number[];
-  edge: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+  edge: ResizableEdge;
   mousedownEvent: MouseDownEvent;
 }
 
 export type ResizableMode = EnumObject<typeof Resizable.MODES>;
+export type ResizableEdge = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
