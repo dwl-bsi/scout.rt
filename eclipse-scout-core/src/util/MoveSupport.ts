@@ -52,6 +52,9 @@ export class MoveSupport<TElem extends Widget> extends EventEmitter {
     this._releasingScrollHandler = this._onReleasingScroll.bind(this);
   }
 
+  /**
+   * @return `true` if the dragging was started successfully, falsy otherwise.
+   */
   start(event: JQuery.MouseDownEvent, elements: TElem[], draggedElement: TElem): boolean {
     if (this._moveData) {
       // Do nothing, when dragging is already in progress. This can happen when the user leaves
