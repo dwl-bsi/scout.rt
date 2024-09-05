@@ -24,6 +24,9 @@ import org.eclipse.scout.rt.client.extension.ui.form.fields.ValueFieldChains.Val
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.root.IValueFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.root.internal.ValueFieldContextMenu;
+import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
+import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult.ValueState;
+import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.Order;
 import org.eclipse.scout.rt.platform.annotations.ConfigOperation;
@@ -180,20 +183,31 @@ public abstract class AbstractValueField<VALUE> extends AbstractFormField implem
   }
 
   @Override
-  public void loadFromXml(Element x) {
+  public FormFieldXmlLoaderResult loadFromXml(Element x) {
     super.loadFromXml(x);
-    loadValueFromXml(x);
+    return loadValueFromXml(x);
   }
 
-  protected void loadValueFromXml(Element x) {
+  protected FormFieldXmlLoaderResult loadValueFromXml(Element x) {
+    FormFieldXmlLoaderResult result = new FormFieldXmlLoaderResult();
     try {
-      VALUE value = TypeCastUtility.castValue(XmlUtility.getObjectAttribute(x, "value"), getHolderType());
-      setValue(value);
+      Object rawValue = XmlUtility.getObjectAttribute(x, "value");
+      try {
+        VALUE value = TypeCastUtility.castValue(rawValue, getHolderType());
+        setValue(value);
+      }
+      catch (Exception e) {
+        result.setValue(rawValue);
+        result.setValueState(ValueState.DESERIALIZATION_FAILED);
+        throw e;
+      }
     }
     catch (Exception e) {
       // be lenient, maybe the field was changed
       LOG.warn("Could not load form XML [{}]", getClass().getName(), e);
+      result.setHasError(true);
     }
+    return result;
   }
 
   @Override

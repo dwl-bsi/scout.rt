@@ -39,6 +39,7 @@ import org.eclipse.scout.rt.client.ui.basic.tree.AbstractTree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeEvent;
+import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.composer.node.AbstractComposerNode;
 import org.eclipse.scout.rt.client.ui.form.fields.composer.node.AttributeNode;
@@ -435,21 +436,25 @@ public abstract class AbstractComposerField extends AbstractFormField implements
   }
 
   @Override
-  public void loadFromXml(Element x) {
-    super.loadFromXml(x);
+  public FormFieldXmlLoaderResult loadFromXml(Element x) {
+    FormFieldXmlLoaderResult result = super.loadFromXml(x);
     ITree tree = getTree();
     try {
       tree.setTreeChanging(true);
       //
       getTree().removeAllChildNodes(getTree().getRootNode());
-      loadXMLRec(x, getTree().getRootNode());
+      if (!loadXMLRec(x, getTree().getRootNode())) {
+        result.setHasError(true);
+      }
     }
     finally {
       tree.setTreeChanging(false);
     }
+    return result;
   }
 
-  private void loadXMLRec(Element x, ITreeNode parent) {
+  private boolean loadXMLRec(Element x, ITreeNode parent) {
+    boolean success = true;
     // build tree
     for (Element xmlElem : XmlUtility.getChildElements(x)) {
       if ("attribute".equals(xmlElem.getTagName())) {
@@ -474,6 +479,7 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         }
         catch (Exception e) {
           LOG.warn("read op", e);
+          success = false;
           continue;
         }
         List<Object> valueList = new ArrayList<>();
@@ -487,6 +493,7 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         }
         catch (Exception e) {
           LOG.warn("read value for attribute {}", id, e);
+          success = false;
           continue;
         }
         List<String> displayValueList = new ArrayList<>();
@@ -505,12 +512,13 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         IDataModelAttribute foundAtt = (attPath != null ? attPath.getAttribute() : null);
         if (foundAtt == null) {
           LOG.warn("cannot find attribute with id={}", id);
+          success = false;
           continue;
         }
         ITreeNode node = addAttributeNode(parent, foundAtt, aggregationType, op, valueList, displayValueList);
         if (node != null) {
           // add children recursive
-          loadXMLRec(xmlElem, node);
+          success &= loadXMLRec(xmlElem, node);
         }
       }
       else if ("entity".equals(xmlElem.getTagName())) {
@@ -525,12 +533,13 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         IDataModelEntity foundEntity = (entityPath != null ? entityPath.lastElement() : null);
         if (foundEntity == null) {
           LOG.warn("cannot find entity with id={}", id);
+          success = false;
           continue;
         }
         ITreeNode node = addEntityNode(parent, foundEntity, negated, null, text != null ? Collections.singletonList(text) : null);
         if (node != null) {
           // add children recursive
-          loadXMLRec(xmlElem, node);
+          success &= loadXMLRec(xmlElem, node);
         }
       }
       else if ("or".equals(xmlElem.getTagName())) {
@@ -554,11 +563,11 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         }
         if (node != null) {
           // add children recursive
-          loadXMLRec(xmlElem, node);
+          success &= loadXMLRec(xmlElem, node);
         }
       }
-
     }
+    return success;
   }
 
   @Override

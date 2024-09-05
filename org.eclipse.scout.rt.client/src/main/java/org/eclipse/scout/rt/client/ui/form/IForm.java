@@ -597,7 +597,7 @@ public interface IForm extends IWidget, ITypeWithSettableClassId, IStyleable, ID
   /**
    * XML export/import of form state
    */
-  void loadFromXmlString(String xml);
+  FormXmlLoaderResult loadFromXmlString(String xml);
 
   String storeToXmlString();
 
@@ -605,7 +605,7 @@ public interface IForm extends IWidget, ITypeWithSettableClassId, IStyleable, ID
 
   void storeToXml(Element root);
 
-  void loadFromXml(Element root);
+  FormXmlLoaderResult loadFromXml(Element root);
 
   /**
    * Wait until form is closed<br>

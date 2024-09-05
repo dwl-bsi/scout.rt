@@ -98,6 +98,7 @@ import org.eclipse.scout.rt.client.ui.form.internal.FindFieldByXmlIdsVisitor;
 import org.eclipse.scout.rt.client.ui.form.internal.FormDataPropertyFilter;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
 import org.eclipse.scout.rt.client.ui.messagebox.MessageBoxes;
+import org.eclipse.scout.rt.client.ui.notification.Notification;
 import org.eclipse.scout.rt.client.ui.wizard.IWizard;
 import org.eclipse.scout.rt.client.ui.wizard.IWizardStep;
 import org.eclipse.scout.rt.platform.BEANS;
@@ -126,12 +127,14 @@ import org.eclipse.scout.rt.platform.resource.BinaryResource;
 import org.eclipse.scout.rt.platform.status.IMultiStatus;
 import org.eclipse.scout.rt.platform.status.IStatus;
 import org.eclipse.scout.rt.platform.status.MultiStatus;
+import org.eclipse.scout.rt.platform.status.Status;
 import org.eclipse.scout.rt.platform.text.TEXTS;
 import org.eclipse.scout.rt.platform.util.Assertions;
 import org.eclipse.scout.rt.platform.util.BeanUtility;
 import org.eclipse.scout.rt.platform.util.CollectionUtility;
 import org.eclipse.scout.rt.platform.util.PreferredValue;
 import org.eclipse.scout.rt.platform.util.StringUtility;
+import org.eclipse.scout.rt.platform.util.TypeCastUtility;
 import org.eclipse.scout.rt.platform.util.XmlUtility;
 import org.eclipse.scout.rt.platform.util.concurrent.IRunnable;
 import org.eclipse.scout.rt.platform.util.visitor.CollectingVisitor;
@@ -2214,12 +2217,20 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
   }
 
   @Override
-  public void loadFromXmlString(String xml) {
+  public FormXmlLoaderResult loadFromXmlString(String xml) {
+    FormXmlLoaderResult result = new FormXmlLoaderResult();
     if (xml == null) {
-      return;
+      return result;
     }
-    Document xmlDocument = XmlUtility.getXmlDocument(xml);
-    loadFromXml(xmlDocument.getDocumentElement());
+    try {
+      Document xmlDocument = XmlUtility.getXmlDocument(xml);
+      return loadFromXml(xmlDocument.getDocumentElement());
+    }
+    catch (Exception e) {
+      LOG.warn("Unable to load xml document.", e);
+      result.markFatalError();
+    }
+    return result;
   }
 
   @Override
@@ -2311,12 +2322,13 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
   }
 
   @Override
-  public void loadFromXml(Element root) {
+  public FormXmlLoaderResult loadFromXml(Element root) {
+    FormXmlLoaderResult result = new FormXmlLoaderResult();
     // load properties
     Element xProps = XmlUtility.getFirstChildElement(root, "properties");
     if (xProps != null) {
-      Map<String, Object> props = loadPropertiesFromXml(xProps);
-      BeanUtility.setProperties(this, props, true, null);
+      FormXmlPropertiesLoaderResult propertiesLoaderResult = loadPropertiesFromXml(xProps);
+      BeanUtility.setProperties(this, propertiesLoaderResult.getProperties(), true, null, (n, v) -> propertiesLoaderResult.addPropertyWithInvalidValue(n, v));
 
       // load extension properties
       for (Element xExtension : XmlUtility.getChildElements(xProps, "extension")) {
@@ -2326,9 +2338,10 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         if (extension == null) {
           continue;
         }
-        Map<String, Object> extensionProps = loadPropertiesFromXml(xExtension);
-        BeanUtility.setProperties(extension, extensionProps, true, null);
+        FormXmlPropertiesLoaderResult extensionPropertiesResult = loadPropertiesFromXml(xExtension);
+        BeanUtility.setProperties(extension, extensionPropertiesResult.getProperties(), true, null, (n, v) -> propertiesLoaderResult.addPropertyWithInvalidValue(n, v));
       }
+      result.add(propertiesLoaderResult);
     }
 
     // load fields
@@ -2345,7 +2358,16 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         visit(v, IFormField.class);
         IFormField f = v.getField();
         if (f != null) {
-          f.loadFromXml(xField);
+          try {
+            FormFieldXmlLoaderResult fieldXmlLoadResult = f.loadFromXml(xField);
+            result.add(f, xmlFieldIds, fieldXmlLoadResult);
+          }
+          catch (Exception e) {
+            result.addFieldWithInvalidValue(f, xmlFieldIds, null);
+          }
+        }
+        else {
+          handleUnknownField(xField, result, xmlFieldIds);
         }
       }
     }
@@ -2362,6 +2384,18 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         }
       }
     }, ITabBox.class);
+    return result;
+  }
+
+  private void handleUnknownField(Element xField, FormXmlLoaderResult result, List<String> xmlFieldIds) {
+    try {
+      Object value = XmlUtility.getObjectAttribute(xField, "value");
+      String readableValue = TypeCastUtility.castValue(value, String.class);
+      result.addUnknownField(xmlFieldIds, readableValue);
+    }
+    catch (Exception e) {
+      result.addUnknownFieldWithInvalidValue(xmlFieldIds);
+    }
   }
 
   /**
@@ -2389,7 +2423,8 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
    * @return Map of property name to property value
    * @see #storePropertiesToXml(Element, Map)
    */
-  protected Map<String, Object> loadPropertiesFromXml(Element xProps) {
+  protected FormXmlPropertiesLoaderResult loadPropertiesFromXml(Element xProps) {
+    FormXmlPropertiesLoaderResult result = new FormXmlPropertiesLoaderResult();
     Map<String, Object> props = new HashMap<>();
     for (Element xProp : XmlUtility.getChildElements(xProps, "property")) {
       String name = xProp.getAttribute("name");
@@ -2399,9 +2434,47 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
       }
       catch (Exception e) {
         LOG.warn("Could not load XML property {}", name, e);
+        result.addPropertyWithInvalidValue(name);
       }
     }
-    return props;
+    result.setProperties(props);
+    return result;
+  }
+
+  public static class FormXmlPropertiesLoaderResult {
+
+    private Map<String, Object> m_properties;
+    private final Map<String, String> m_propertiesWithInvalidValues;
+
+    public FormXmlPropertiesLoaderResult() {
+      m_propertiesWithInvalidValues = new HashMap<>();
+    }
+
+    public Map<String, Object> getProperties() {
+      return m_properties;
+    }
+
+    public void setProperties(Map<String, Object> properties) {
+      m_properties = properties;
+    }
+
+    public void addPropertyWithInvalidValue(String name) {
+      m_propertiesWithInvalidValues.put(name, null);
+    }
+
+    public void addPropertyWithInvalidValue(String name, Object value) {
+      try {
+        String readableValue = TypeCastUtility.castValue(value, String.class);
+        m_propertiesWithInvalidValues.put(name, readableValue);
+      }
+      catch (Exception e) {
+        addPropertyWithInvalidValue(name);
+      }
+    }
+
+    public Map<String, String> getPropertiesWithInvalidValues() {
+      return m_propertiesWithInvalidValues;
+    }
   }
 
   @Override

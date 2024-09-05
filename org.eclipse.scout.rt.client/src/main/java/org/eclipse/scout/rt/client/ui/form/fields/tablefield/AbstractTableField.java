@@ -32,6 +32,8 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
 import org.eclipse.scout.rt.client.ui.basic.table.TableListener;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
+import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
+import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IValidateContentDescriptor;
 import org.eclipse.scout.rt.platform.Order;
@@ -293,8 +295,8 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
   }
 
   @Override
-  public void loadFromXml(Element x) {
-    super.loadFromXml(x);
+  public FormFieldXmlLoaderResult loadFromXml(Element x) {
+    FormFieldXmlLoaderResult result = super.loadFromXml(x);
     if (m_table != null) {
       int[] selectedRowIndices = null;
       try {
@@ -302,6 +304,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
       }
       catch (Exception e) {
         LOG.warn("reading attribute 'selectedRowIndices'", e);
+        result.setHasError(true);
       }
       Object[][] dataMatrix = null;
       try {
@@ -309,6 +312,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
       }
       catch (Exception e) {
         LOG.warn("reading attribute 'rows'", e);
+        result.setHasError(true);
       }
       m_table.discardAllRows();
       if (dataMatrix != null && dataMatrix.length > 0) {
@@ -318,6 +322,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
         m_table.selectRows(m_table.getRows(selectedRowIndices));
       }
     }
+    return result;
   }
 
   @Override

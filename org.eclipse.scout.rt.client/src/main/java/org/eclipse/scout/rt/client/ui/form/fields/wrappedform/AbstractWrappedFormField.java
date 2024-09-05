@@ -19,7 +19,9 @@ import org.eclipse.scout.rt.client.extension.ui.form.fields.wrappedform.IWrapped
 import org.eclipse.scout.rt.client.extension.ui.form.fields.wrappedform.WrappedFormFieldChains.WrappedFormFieldInnerFormChangedChain;
 import org.eclipse.scout.rt.client.ui.IWidget;
 import org.eclipse.scout.rt.client.ui.form.FormEvent;
+import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.FormListener;
+import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
@@ -258,11 +260,12 @@ public abstract class AbstractWrappedFormField<FORM extends IForm> extends Abstr
   }
 
   @Override
-  public void loadFromXml(Element x) {
-    super.loadFromXml(x);
+  public FormFieldXmlLoaderResult loadFromXml(Element x) {
+    FormFieldXmlLoaderResult result = super.loadFromXml(x);
     if (getInnerForm() != null) {
-      getInnerForm().loadFromXml(x);
+      getInnerForm().loadFromXml(x); // FIXME muss doch das ganze form zurückgeben...
     }
+    return result;
   }
 
   @Override

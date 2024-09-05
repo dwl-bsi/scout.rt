@@ -18,6 +18,8 @@ import org.eclipse.scout.rt.client.ui.IWidget;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenuOwner;
 import org.eclipse.scout.rt.client.ui.desktop.datachange.IDataChangeObserver;
+import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
+import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.groupbox.IGroupBox;
 import org.eclipse.scout.rt.platform.IOrdered;
@@ -245,11 +247,11 @@ public interface IFormField extends IWidget, IOrdered, IStyleable, IVisibleDimen
 
   String storeToXmlString();
 
-  void loadFromXmlString(String xml);
+  FormFieldXmlLoaderResult loadFromXmlString(String xml);
 
   void storeToXml(Element x);
 
-  void loadFromXml(Element x);
+  FormFieldXmlLoaderResult loadFromXml(Element x);
 
   /**
    * add verbose information to the search filter

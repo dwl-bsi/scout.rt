@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,6 +34,7 @@ import org.eclipse.scout.rt.platform.reflect.FastPropertyDescriptor;
 import org.eclipse.scout.rt.platform.reflect.IPropertyFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xml.sax.ErrorHandler;
 
 public final class BeanUtility {
   private static final Logger LOG = LoggerFactory.getLogger(BeanUtility.class);
@@ -90,6 +92,10 @@ public final class BeanUtility {
    *          filter
    */
   public static void setProperties(Object to, Map<String, Object> map, boolean lenient, IPropertyFilter filter) {
+    setProperties(to, map, lenient, filter, null);
+  }
+
+  public static void setProperties(Object to, Map<String, Object> map, boolean lenient, IPropertyFilter filter, BiConsumer<String, Object> propertyErrorHandler) {
     FastBeanInfo toInfo = getFastBeanInfo(to.getClass(), null);
     for (Entry<String, Object> entry : map.entrySet()) {
       String name = entry.getKey();
@@ -104,6 +110,9 @@ public final class BeanUtility {
         }
       }
       catch (Exception e) {
+        if (propertyErrorHandler != null) {
+          propertyErrorHandler.accept(name, value);
+        }
         if (lenient) {
           LOG.warn("Could not set property property '{}' to value '{}'", name, value, e);
         }
