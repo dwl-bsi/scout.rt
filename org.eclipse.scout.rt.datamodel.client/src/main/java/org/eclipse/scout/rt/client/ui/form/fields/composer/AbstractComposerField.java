@@ -39,7 +39,7 @@ import org.eclipse.scout.rt.client.ui.basic.tree.AbstractTree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeEvent;
-import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
+import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.composer.node.AbstractComposerNode;
 import org.eclipse.scout.rt.client.ui.form.fields.composer.node.AttributeNode;
@@ -436,15 +436,15 @@ public abstract class AbstractComposerField extends AbstractFormField implements
   }
 
   @Override
-  public FormFieldXmlLoaderResult loadFromXml(Element x) {
-    FormFieldXmlLoaderResult result = super.loadFromXml(x);
+  public FormXmlLoaderResult loadFromXml(Element x) {
+    FormXmlLoaderResult result = super.loadFromXml(x);
     ITree tree = getTree();
     try {
       tree.setTreeChanging(true);
       //
       getTree().removeAllChildNodes(getTree().getRootNode());
       if (!loadXMLRec(x, getTree().getRootNode())) {
-        result.setHasError(true);
+        result.addFieldWithInvalidValue(this, null, null);
       }
     }
     finally {

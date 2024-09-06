@@ -24,8 +24,6 @@ import org.eclipse.scout.rt.client.extension.ui.form.fields.ValueFieldChains.Val
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.root.IValueFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.root.internal.ValueFieldContextMenu;
-import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
-import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult.ValueState;
 import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.Order;
@@ -183,29 +181,31 @@ public abstract class AbstractValueField<VALUE> extends AbstractFormField implem
   }
 
   @Override
-  public FormFieldXmlLoaderResult loadFromXml(Element x) {
+  public FormXmlLoaderResult loadFromXml(Element x) {
     super.loadFromXml(x);
     return loadValueFromXml(x);
   }
 
-  protected FormFieldXmlLoaderResult loadValueFromXml(Element x) {
-    FormFieldXmlLoaderResult result = new FormFieldXmlLoaderResult();
+  protected FormXmlLoaderResult loadValueFromXml(Element x) {
+    FormXmlLoaderResult result = new FormXmlLoaderResult();
+    Object rawValue;
     try {
-      Object rawValue = XmlUtility.getObjectAttribute(x, "value");
-      try {
-        VALUE value = TypeCastUtility.castValue(rawValue, getHolderType());
-        setValue(value);
-      }
-      catch (Exception e) {
-        result.setValue(rawValue);
-        result.setValueState(ValueState.DESERIALIZATION_FAILED);
-        throw e;
-      }
+      rawValue = XmlUtility.getObjectAttribute(x, "value");
     }
     catch (Exception e) {
       // be lenient, maybe the field was changed
       LOG.warn("Could not load form XML [{}]", getClass().getName(), e);
-      result.setHasError(true);
+      result.addFieldWithInvalidValue(this);
+      return result;
+    }
+    try {
+      VALUE value = TypeCastUtility.castValue(rawValue, getHolderType());
+      setValue(value);
+    }
+    catch (Exception e) {
+      // be lenient, maybe the field was changed
+      LOG.warn("Could not load form XML [{}]", getClass().getName(), e);
+      result.addFieldWithInvalidValue(this, null, rawValue);
     }
     return result;
   }

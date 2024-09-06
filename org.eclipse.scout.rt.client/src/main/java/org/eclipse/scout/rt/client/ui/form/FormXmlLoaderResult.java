@@ -13,79 +13,147 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.scout.rt.client.ui.form.AbstractForm.FormXmlPropertiesLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
+import org.eclipse.scout.rt.platform.util.CollectionUtility;
 import org.eclipse.scout.rt.platform.util.StringUtility;
 
 public class FormXmlLoaderResult {
 
-  private boolean m_isFatalError;
-  private Map<String, String> m_invalidProperties;
-  private Map<String, String> m_unknownFields;
-  private Map<String, String> m_invalidFields;
+  private boolean m_isUnexpectedError;
+  private String m_scoutCorrelationId;
+
+  // a null value means that there was an error parsing the object
+  private Map<FieldDescriptor, Object> m_invalidProperties;
+  private Map<FieldDescriptor, Object> m_unknownFields;
+  private Map<FieldDescriptor, Object> m_invalidFields;
 
   public FormXmlLoaderResult() {
-    m_isFatalError = false;
+    m_isUnexpectedError = false;
     m_invalidProperties = new HashMap<>();
     m_unknownFields = new HashMap<>();
     m_invalidFields = new HashMap<>();
   }
 
-  private String getFieldId(List<String> xmlFieldIds) {
-    return StringUtility.join(".", xmlFieldIds);
-  }
-
-  public void addUnknownField(List<String> xmlFieldIds, String value) {
-    m_unknownFields.put(getFieldId(xmlFieldIds), value);
+  public void addUnknownField(List<String> xmlFieldIds, Object value) {
+    m_unknownFields.put(new FieldDescriptor(xmlFieldIds, null), value);
   }
 
   public void addUnknownFieldWithInvalidValue(List<String> xmlFieldIds) {
-    m_unknownFields.put(getFieldId(xmlFieldIds), null);
+    m_unknownFields.put(new FieldDescriptor(xmlFieldIds, null), null);
   }
 
-  public void add(IFormField f, List<String> xmlFieldIds, FormFieldXmlLoaderResult fieldResult) {
-    if (fieldResult.isHasError()) {
-      addFieldWithInvalidValue(f, xmlFieldIds, fieldResult.getValue());
-    }
+  public void addFieldWithInvalidValue(IFormField formField, List<String> xmlFieldIds, Object value) {
+    String label = formField.getLabel();
+    m_invalidFields.put(new FieldDescriptor(xmlFieldIds, label), value);
+  }
+
+  public void addFieldWithInvalidValue(IFormField formField) {
+    addFieldWithInvalidValue(formField, null, null);
+  }
+
+  public void combineWith(List<String> xmlFieldIds, FormXmlLoaderResult fieldResult) {
+    fieldResult.getInvalidFields().forEach((d, v) -> combineWith(xmlFieldIds, d, v, m_invalidFields));
+    fieldResult.getUnknownFields().forEach((d, v) -> combineWith(xmlFieldIds, d, v, m_unknownFields));
+    fieldResult.getInvalidProperties().forEach((d, v) -> combineWith(xmlFieldIds, d, v, m_invalidProperties));
+  }
+
+  private void combineWith(List<String> xmlFieldIds, FieldDescriptor descriptor, Object value, Map<FieldDescriptor, Object> fields) {
+    descriptor.setFieldIds(CollectionUtility.combine(xmlFieldIds, descriptor.getFieldIds()));
+    fields.put(descriptor, value);
   }
 
   public void markFatalError() {
-    m_isFatalError = true;
+    m_isUnexpectedError = true;
   }
 
-  public void addFieldWithInvalidValue(IFormField formField, List<String> xmlFieldIds, String value) {
-    String label = formField.getLabel();
-    String fieldName;
-    if (StringUtility.hasText(label)) {
-      fieldName = StringUtility.concatenateTokens(label, "(", getFieldId(xmlFieldIds), ")");
-    }
-    else {
-      fieldName = getFieldId(xmlFieldIds);
-    }
-    m_invalidFields.put(fieldName, value);
+  public boolean isUnexpectedError() {
+    return m_isUnexpectedError;
   }
 
-  public void add(FormXmlPropertiesLoaderResult propertiesLoaderResult) {
-    m_invalidProperties = propertiesLoaderResult.getPropertiesWithInvalidValues();
+  public String getScoutCorrelationId() {
+    return m_scoutCorrelationId;
   }
 
-  public boolean isFatalError() {
-    return m_isFatalError;
+  public void setScoutCorrelationId(String scoutCorrelationId) {
+    m_scoutCorrelationId = scoutCorrelationId;
   }
 
   public boolean isHasErrors() {
-    return isFatalError() || !m_invalidProperties.isEmpty() || !m_invalidFields.isEmpty() || !m_unknownFields.isEmpty();
+    return isUnexpectedError() || !m_invalidProperties.isEmpty() || !m_invalidFields.isEmpty() || !m_unknownFields.isEmpty();
   }
 
-  public Map<String, String> getInvalidProperties() {
+  public Map<FieldDescriptor, Object> getInvalidProperties() {
     return m_invalidProperties;
   }
 
-  public Map<String, String> getUnknownFields() {
+  public Map<FieldDescriptor, Object> getUnknownFields() {
     return m_unknownFields;
   }
 
-  public Map<String, String> getInvalidFields() {
+  public Map<FieldDescriptor, Object> getInvalidFields() {
     return m_invalidFields;
+  }
+
+  public void addPropertyWithInvalidValue(String propertyName) {
+    addPropertyWithInvalidValue(propertyName, null);
+  }
+
+  public void addPropertyWithInvalidValue(String propertyName, Object value) {
+    m_invalidProperties.put(new FieldDescriptor(propertyName), value);
+  }
+
+  public static class FieldDescriptor {
+    private List<String> m_fieldIds;
+    private String m_label;
+
+    public FieldDescriptor(String fieldId) {
+      this(List.of(fieldId));
+    }
+
+    public FieldDescriptor(List<String> fieldIds) {
+      this(fieldIds, null);
+    }
+
+    public FieldDescriptor(List<String> fieldIds, String label) {
+      m_fieldIds = fieldIds;
+      m_label = label;
+    }
+
+    public List<String> getFieldIds() {
+      return m_fieldIds;
+    }
+
+    public void setFieldIds(List<String> fieldIds) {
+      m_fieldIds = fieldIds;
+    }
+
+    public String getLabel() {
+      return m_label;
+    }
+
+    public void setLabel(String label) {
+      m_label = label;
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder result = new StringBuilder();
+      if (StringUtility.hasText(m_label)) {
+        result.append(m_label).append(" (");
+        result.append(appendFieldIds());
+        result.append(")");
+      }
+      else {
+        result.append(appendFieldIds());
+      }
+      return result.toString();
+    }
+
+    private String appendFieldIds() {
+      if (m_fieldIds != null) {
+        return String.join(".", m_fieldIds);
+      }
+      return "";
+    }
   }
 }

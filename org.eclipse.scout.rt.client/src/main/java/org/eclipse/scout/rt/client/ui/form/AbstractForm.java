@@ -98,7 +98,6 @@ import org.eclipse.scout.rt.client.ui.form.internal.FindFieldByXmlIdsVisitor;
 import org.eclipse.scout.rt.client.ui.form.internal.FormDataPropertyFilter;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
 import org.eclipse.scout.rt.client.ui.messagebox.MessageBoxes;
-import org.eclipse.scout.rt.client.ui.notification.Notification;
 import org.eclipse.scout.rt.client.ui.wizard.IWizard;
 import org.eclipse.scout.rt.client.ui.wizard.IWizardStep;
 import org.eclipse.scout.rt.platform.BEANS;
@@ -106,6 +105,9 @@ import org.eclipse.scout.rt.platform.Order;
 import org.eclipse.scout.rt.platform.annotations.ConfigOperation;
 import org.eclipse.scout.rt.platform.annotations.ConfigProperty;
 import org.eclipse.scout.rt.platform.classid.ClassId;
+import org.eclipse.scout.rt.platform.context.CorrelationId;
+import org.eclipse.scout.rt.platform.context.RunContext;
+import org.eclipse.scout.rt.platform.context.RunContexts;
 import org.eclipse.scout.rt.platform.exception.ExceptionHandler;
 import org.eclipse.scout.rt.platform.exception.PlatformError;
 import org.eclipse.scout.rt.platform.exception.PlatformException;
@@ -127,14 +129,13 @@ import org.eclipse.scout.rt.platform.resource.BinaryResource;
 import org.eclipse.scout.rt.platform.status.IMultiStatus;
 import org.eclipse.scout.rt.platform.status.IStatus;
 import org.eclipse.scout.rt.platform.status.MultiStatus;
-import org.eclipse.scout.rt.platform.status.Status;
 import org.eclipse.scout.rt.platform.text.TEXTS;
 import org.eclipse.scout.rt.platform.util.Assertions;
 import org.eclipse.scout.rt.platform.util.BeanUtility;
 import org.eclipse.scout.rt.platform.util.CollectionUtility;
+import org.eclipse.scout.rt.platform.util.Pair;
 import org.eclipse.scout.rt.platform.util.PreferredValue;
 import org.eclipse.scout.rt.platform.util.StringUtility;
-import org.eclipse.scout.rt.platform.util.TypeCastUtility;
 import org.eclipse.scout.rt.platform.util.XmlUtility;
 import org.eclipse.scout.rt.platform.util.concurrent.IRunnable;
 import org.eclipse.scout.rt.platform.util.visitor.CollectingVisitor;
@@ -2218,19 +2219,25 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
 
   @Override
   public FormXmlLoaderResult loadFromXmlString(String xml) {
-    FormXmlLoaderResult result = new FormXmlLoaderResult();
     if (xml == null) {
-      return result;
+      return new FormXmlLoaderResult();
     }
-    try {
-      Document xmlDocument = XmlUtility.getXmlDocument(xml);
-      return loadFromXml(xmlDocument.getDocumentElement());
-    }
-    catch (Exception e) {
-      LOG.warn("Unable to load xml document.", e);
-      result.markFatalError();
-    }
-    return result;
+    RunContext runContext = RunContexts.copyCurrent();
+    String cid = runContext.getCorrelationId() != null ? runContext.getCorrelationId() : BEANS.get(CorrelationId.class).newCorrelationId();
+    return runContext.withCorrelationId(cid)
+        .call(() -> {
+          FormXmlLoaderResult result = new FormXmlLoaderResult();
+          try {
+            Document xmlDocument = XmlUtility.getXmlDocument(xml);
+            return loadFromXml(xmlDocument.getDocumentElement());
+          }
+          catch (Exception e) {
+            LOG.warn("Unable to load xml document.", e);
+            result.markFatalError();
+            result.setScoutCorrelationId(cid);
+          }
+          return result;
+        });
   }
 
   @Override
@@ -2305,7 +2312,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
   /**
    * Adds a &lt;property&gt; element for every given property to the parent element.
    *
-   * @see #loadPropertiesFromXml(Element)
+   * @see #loadPropertiesFromXml(Element, FormXmlLoaderResult)
    */
   protected void storePropertiesToXml(Element parent, Map<String, Object> props) {
     for (Entry<String, Object> entry : props.entrySet()) {
@@ -2327,8 +2334,8 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
     // load properties
     Element xProps = XmlUtility.getFirstChildElement(root, "properties");
     if (xProps != null) {
-      FormXmlPropertiesLoaderResult propertiesLoaderResult = loadPropertiesFromXml(xProps);
-      BeanUtility.setProperties(this, propertiesLoaderResult.getProperties(), true, null, (n, v) -> propertiesLoaderResult.addPropertyWithInvalidValue(n, v));
+      Map<String, Object> props = loadPropertiesFromXml(xProps, result);
+      BeanUtility.setProperties(this, props, true, null, (n, v) -> result.addPropertyWithInvalidValue(n, v));
 
       // load extension properties
       for (Element xExtension : XmlUtility.getChildElements(xProps, "extension")) {
@@ -2338,10 +2345,9 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         if (extension == null) {
           continue;
         }
-        FormXmlPropertiesLoaderResult extensionPropertiesResult = loadPropertiesFromXml(xExtension);
-        BeanUtility.setProperties(extension, extensionPropertiesResult.getProperties(), true, null, (n, v) -> propertiesLoaderResult.addPropertyWithInvalidValue(n, v));
+        Map<String, Object> extensionProps = loadPropertiesFromXml(xExtension, result);
+        BeanUtility.setProperties(extension, extensionProps, true, null, (n, v) -> result.addPropertyWithInvalidValue(n, v));
       }
-      result.add(propertiesLoaderResult);
     }
 
     // load fields
@@ -2359,8 +2365,8 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         IFormField f = v.getField();
         if (f != null) {
           try {
-            FormFieldXmlLoaderResult fieldXmlLoadResult = f.loadFromXml(xField);
-            result.add(f, xmlFieldIds, fieldXmlLoadResult);
+            FormXmlLoaderResult fieldXmlLoadResult = f.loadFromXml(xField);
+            result.combineWith(xmlFieldIds, fieldXmlLoadResult);
           }
           catch (Exception e) {
             result.addFieldWithInvalidValue(f, xmlFieldIds, null);
@@ -2390,8 +2396,9 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
   private void handleUnknownField(Element xField, FormXmlLoaderResult result, List<String> xmlFieldIds) {
     try {
       Object value = XmlUtility.getObjectAttribute(xField, "value");
-      String readableValue = TypeCastUtility.castValue(value, String.class);
-      result.addUnknownField(xmlFieldIds, readableValue);
+      if (value != null) { // TODO dwl: oder falls child-elements vorhanden sind? compositeField / innerForm
+        result.addUnknownField(xmlFieldIds, value);
+      }
     }
     catch (Exception e) {
       result.addUnknownFieldWithInvalidValue(xmlFieldIds);
@@ -2423,8 +2430,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
    * @return Map of property name to property value
    * @see #storePropertiesToXml(Element, Map)
    */
-  protected FormXmlPropertiesLoaderResult loadPropertiesFromXml(Element xProps) {
-    FormXmlPropertiesLoaderResult result = new FormXmlPropertiesLoaderResult();
+  protected Map<String, Object> loadPropertiesFromXml(Element xProps, FormXmlLoaderResult result) {
     Map<String, Object> props = new HashMap<>();
     for (Element xProp : XmlUtility.getChildElements(xProps, "property")) {
       String name = xProp.getAttribute("name");
@@ -2437,44 +2443,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         result.addPropertyWithInvalidValue(name);
       }
     }
-    result.setProperties(props);
-    return result;
-  }
-
-  public static class FormXmlPropertiesLoaderResult {
-
-    private Map<String, Object> m_properties;
-    private final Map<String, String> m_propertiesWithInvalidValues;
-
-    public FormXmlPropertiesLoaderResult() {
-      m_propertiesWithInvalidValues = new HashMap<>();
-    }
-
-    public Map<String, Object> getProperties() {
-      return m_properties;
-    }
-
-    public void setProperties(Map<String, Object> properties) {
-      m_properties = properties;
-    }
-
-    public void addPropertyWithInvalidValue(String name) {
-      m_propertiesWithInvalidValues.put(name, null);
-    }
-
-    public void addPropertyWithInvalidValue(String name, Object value) {
-      try {
-        String readableValue = TypeCastUtility.castValue(value, String.class);
-        m_propertiesWithInvalidValues.put(name, readableValue);
-      }
-      catch (Exception e) {
-        addPropertyWithInvalidValue(name);
-      }
-    }
-
-    public Map<String, String> getPropertiesWithInvalidValues() {
-      return m_propertiesWithInvalidValues;
-    }
+    return props;
   }
 
   @Override

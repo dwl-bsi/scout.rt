@@ -44,7 +44,6 @@ import org.eclipse.scout.rt.client.ui.action.menu.root.IFormFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.root.internal.FormFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.datachange.IDataChangeListener;
-import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.groupbox.AbstractGroupBox;
@@ -1302,20 +1301,20 @@ public abstract class AbstractFormField extends AbstractWidget implements IFormF
   }
 
   @Override
-  public FormFieldXmlLoaderResult loadFromXml(Element x) {
-    return new FormFieldXmlLoaderResult();
+  public FormXmlLoaderResult loadFromXml(Element x) {
+    return new FormXmlLoaderResult();
   }
 
   @Override
-  public final FormFieldXmlLoaderResult loadFromXmlString(String xml) {
-    FormFieldXmlLoaderResult result = new FormFieldXmlLoaderResult();
+  public final FormXmlLoaderResult loadFromXmlString(String xml) {
+    FormXmlLoaderResult result = new FormXmlLoaderResult();
     if (xml == null) {
       return result;
     }
     try {
       Document doc = XmlUtility.getXmlDocument(xml);
       Element root = doc.getDocumentElement();
-      result.add(loadFromXml(root));
+      result.combineWith(null, loadFromXml(root));
     }
     catch (Exception e) {
       throw new ProcessingException("Error in AbstractFormField.setXML: ", e);

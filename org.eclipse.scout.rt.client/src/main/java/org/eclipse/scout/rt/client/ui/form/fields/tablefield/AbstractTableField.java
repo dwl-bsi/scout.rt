@@ -32,7 +32,6 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
 import org.eclipse.scout.rt.client.ui.basic.table.TableListener;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
-import org.eclipse.scout.rt.client.ui.form.FormFieldXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.FormXmlLoaderResult;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IValidateContentDescriptor;
@@ -295,8 +294,9 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
   }
 
   @Override
-  public FormFieldXmlLoaderResult loadFromXml(Element x) {
-    FormFieldXmlLoaderResult result = super.loadFromXml(x);
+  public FormXmlLoaderResult loadFromXml(Element x) {
+    FormXmlLoaderResult result = super.loadFromXml(x);
+    boolean success = true;
     if (m_table != null) {
       int[] selectedRowIndices = null;
       try {
@@ -304,7 +304,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
       }
       catch (Exception e) {
         LOG.warn("reading attribute 'selectedRowIndices'", e);
-        result.setHasError(true);
+        success = false;
       }
       Object[][] dataMatrix = null;
       try {
@@ -312,7 +312,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
       }
       catch (Exception e) {
         LOG.warn("reading attribute 'rows'", e);
-        result.setHasError(true);
+        success = false;
       }
       m_table.discardAllRows();
       if (dataMatrix != null && dataMatrix.length > 0) {
@@ -321,6 +321,9 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
       if (selectedRowIndices != null && selectedRowIndices.length > 0) {
         m_table.selectRows(m_table.getRows(selectedRowIndices));
       }
+    }
+    if (!success) {
+      result.addFieldWithInvalidValue(this);
     }
     return result;
   }
