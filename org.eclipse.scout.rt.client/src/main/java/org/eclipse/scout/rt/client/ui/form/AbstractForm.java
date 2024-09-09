@@ -2362,7 +2362,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         xmlFieldIds.add(xField.getAttribute("fieldId"));
         FindFieldByXmlIdsVisitor v = new FindFieldByXmlIdsVisitor(xmlFieldIds.toArray(new String[0]));
         visit(v, IFormField.class);
-        IFormField f = v.getField();
+        IFormField f = v.getField(); // FIXME: Das findet konfigurierte Tabellen Unterentitäten...?
         if (f != null) {
           try {
             FormXmlLoaderResult fieldXmlLoadResult = f.loadFromXml(xField);
@@ -2395,9 +2395,16 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
 
   private void handleUnknownField(Element xField, FormXmlLoaderResult result, List<String> xmlFieldIds) {
     try {
+      // TODO dwl: welche fälle gibt es alles (xml attribute mit values)?
       Object value = XmlUtility.getObjectAttribute(xField, "value");
-      if (value != null) { // TODO dwl: oder falls child-elements vorhanden sind? compositeField / innerForm
+      if (value != null) {
         result.addUnknownField(xmlFieldIds, value);
+        return;
+      }
+      Object rows = XmlUtility.getObjectAttribute(xField, "rows");
+      if (rows != null) {
+        result.addUnknownField(xmlFieldIds, rows);
+        return;
       }
     }
     catch (Exception e) {
