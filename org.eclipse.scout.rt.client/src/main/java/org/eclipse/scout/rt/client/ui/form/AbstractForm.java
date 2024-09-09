@@ -2362,7 +2362,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         xmlFieldIds.add(xField.getAttribute("fieldId"));
         FindFieldByXmlIdsVisitor v = new FindFieldByXmlIdsVisitor(xmlFieldIds.toArray(new String[0]));
         visit(v, IFormField.class);
-        IFormField f = v.getField(); // FIXME: Das findet konfigurierte Tabellen Unterentitäten...?
+        IFormField f = v.getField();
         if (f != null) {
           try {
             FormXmlLoaderResult fieldXmlLoadResult = f.loadFromXml(xField);
