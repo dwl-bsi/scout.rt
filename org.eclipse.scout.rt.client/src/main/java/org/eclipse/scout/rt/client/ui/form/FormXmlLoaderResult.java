@@ -20,7 +20,6 @@ import org.eclipse.scout.rt.platform.util.StringUtility;
 public class FormXmlLoaderResult {
 
   private boolean m_isUnexpectedError;
-  private String m_scoutCorrelationId;
 
   // a null value means that there was an error parsing the object
   private Map<FieldDescriptor, Object> m_invalidProperties;
@@ -28,7 +27,6 @@ public class FormXmlLoaderResult {
   private Map<FieldDescriptor, Object> m_invalidFields;
 
   public FormXmlLoaderResult() {
-    m_isUnexpectedError = false;
     m_invalidProperties = new HashMap<>();
     m_unknownFields = new HashMap<>();
     m_invalidFields = new HashMap<>();
@@ -68,14 +66,6 @@ public class FormXmlLoaderResult {
 
   public boolean isUnexpectedError() {
     return m_isUnexpectedError;
-  }
-
-  public String getScoutCorrelationId() {
-    return m_scoutCorrelationId;
-  }
-
-  public void setScoutCorrelationId(String scoutCorrelationId) {
-    m_scoutCorrelationId = scoutCorrelationId;
   }
 
   public boolean isHasErrors() {

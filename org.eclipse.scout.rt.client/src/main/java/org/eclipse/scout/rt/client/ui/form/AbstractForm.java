@@ -105,9 +105,6 @@ import org.eclipse.scout.rt.platform.Order;
 import org.eclipse.scout.rt.platform.annotations.ConfigOperation;
 import org.eclipse.scout.rt.platform.annotations.ConfigProperty;
 import org.eclipse.scout.rt.platform.classid.ClassId;
-import org.eclipse.scout.rt.platform.context.CorrelationId;
-import org.eclipse.scout.rt.platform.context.RunContext;
-import org.eclipse.scout.rt.platform.context.RunContexts;
 import org.eclipse.scout.rt.platform.exception.ExceptionHandler;
 import org.eclipse.scout.rt.platform.exception.PlatformError;
 import org.eclipse.scout.rt.platform.exception.PlatformException;
@@ -133,7 +130,6 @@ import org.eclipse.scout.rt.platform.text.TEXTS;
 import org.eclipse.scout.rt.platform.util.Assertions;
 import org.eclipse.scout.rt.platform.util.BeanUtility;
 import org.eclipse.scout.rt.platform.util.CollectionUtility;
-import org.eclipse.scout.rt.platform.util.Pair;
 import org.eclipse.scout.rt.platform.util.PreferredValue;
 import org.eclipse.scout.rt.platform.util.StringUtility;
 import org.eclipse.scout.rt.platform.util.XmlUtility;
@@ -2219,25 +2215,19 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
 
   @Override
   public FormXmlLoaderResult loadFromXmlString(String xml) {
+    FormXmlLoaderResult result = new FormXmlLoaderResult();
     if (xml == null) {
-      return new FormXmlLoaderResult();
+      return result;
     }
-    RunContext runContext = RunContexts.copyCurrent();
-    String cid = runContext.getCorrelationId() != null ? runContext.getCorrelationId() : BEANS.get(CorrelationId.class).newCorrelationId();
-    return runContext.withCorrelationId(cid)
-        .call(() -> {
-          FormXmlLoaderResult result = new FormXmlLoaderResult();
-          try {
-            Document xmlDocument = XmlUtility.getXmlDocument(xml);
-            return loadFromXml(xmlDocument.getDocumentElement());
-          }
-          catch (Exception e) {
-            LOG.warn("Unable to load xml document.", e);
-            result.markFatalError();
-            result.setScoutCorrelationId(cid);
-          }
-          return result;
-        });
+    try {
+      Document xmlDocument = XmlUtility.getXmlDocument(xml);
+      return loadFromXml(xmlDocument.getDocumentElement());
+    }
+    catch (Exception e) {
+      LOG.warn("Unable to load xml document.", e);
+      result.markFatalError();
+    }
+    return result;
   }
 
   @Override
