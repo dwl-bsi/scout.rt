@@ -2215,19 +2215,11 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
 
   @Override
   public FormXmlLoaderResult loadFromXmlString(String xml) {
-    FormXmlLoaderResult result = new FormXmlLoaderResult();
     if (xml == null) {
-      return result;
+      return new FormXmlLoaderResult();
     }
-    try {
-      Document xmlDocument = XmlUtility.getXmlDocument(xml);
-      return loadFromXml(xmlDocument.getDocumentElement());
-    }
-    catch (Exception e) {
-      LOG.warn("Unable to load xml document.", e);
-      result.markFatalError();
-    }
-    return result;
+    Document xmlDocument = XmlUtility.getXmlDocument(xml);
+    return loadFromXml(xmlDocument.getDocumentElement());
   }
 
   @Override
@@ -2325,7 +2317,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
     Element xProps = XmlUtility.getFirstChildElement(root, "properties");
     if (xProps != null) {
       Map<String, Object> props = loadPropertiesFromXml(xProps, result);
-      BeanUtility.setProperties(this, props, true, null, (n, v) -> result.addPropertyWithInvalidValue(n, v));
+      BeanUtility.setProperties(this, props, true, null, (n, v) -> result.notifyError());
 
       // load extension properties
       for (Element xExtension : XmlUtility.getChildElements(xProps, "extension")) {
@@ -2336,7 +2328,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
           continue;
         }
         Map<String, Object> extensionProps = loadPropertiesFromXml(xExtension, result);
-        BeanUtility.setProperties(extension, extensionProps, true, null, (n, v) -> result.addPropertyWithInvalidValue(n, v));
+        BeanUtility.setProperties(extension, extensionProps, true, null, (n, v) -> result.notifyError());
       }
     }
 
@@ -2356,14 +2348,18 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
         if (f != null) {
           try {
             FormXmlLoaderResult fieldXmlLoadResult = f.loadFromXml(xField);
-            result.combineWith(xmlFieldIds, fieldXmlLoadResult);
+            if (fieldXmlLoadResult.isHasErrors()) {
+              result.notifyError();
+            }
           }
           catch (Exception e) {
-            result.addFieldWithInvalidValue(f, xmlFieldIds, null);
+            // error while loading value
+            result.notifyError();
           }
         }
         else {
-          handleUnknownField(xField, result, xmlFieldIds);
+          // unknown field
+          result.notifyError();
         }
       }
     }
@@ -2381,25 +2377,6 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
       }
     }, ITabBox.class);
     return result;
-  }
-
-  private void handleUnknownField(Element xField, FormXmlLoaderResult result, List<String> xmlFieldIds) {
-    try {
-      // TODO dwl: welche fälle gibt es alles (xml attribute mit values)?
-      Object value = XmlUtility.getObjectAttribute(xField, "value");
-      if (value != null) {
-        result.addUnknownField(xmlFieldIds, value);
-        return;
-      }
-      Object rows = XmlUtility.getObjectAttribute(xField, "rows");
-      if (rows != null) {
-        result.addUnknownField(xmlFieldIds, rows);
-        return;
-      }
-    }
-    catch (Exception e) {
-      result.addUnknownFieldWithInvalidValue(xmlFieldIds);
-    }
   }
 
   /**
@@ -2437,7 +2414,7 @@ public abstract class AbstractForm extends AbstractWidget implements IForm, IExt
       }
       catch (Exception e) {
         LOG.warn("Could not load XML property {}", name, e);
-        result.addPropertyWithInvalidValue(name);
+        result.notifyError();
       }
     }
     return props;

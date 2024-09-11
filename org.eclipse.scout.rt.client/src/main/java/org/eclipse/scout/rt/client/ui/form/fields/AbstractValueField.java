@@ -195,7 +195,7 @@ public abstract class AbstractValueField<VALUE> extends AbstractFormField implem
     catch (Exception e) {
       // be lenient, maybe the field was changed
       LOG.warn("Could not load form XML [{}]", getClass().getName(), e);
-      result.addFieldWithInvalidValue(this);
+      result.notifyError();
       return result;
     }
     try {
@@ -205,7 +205,7 @@ public abstract class AbstractValueField<VALUE> extends AbstractFormField implem
     catch (Exception e) {
       // be lenient, maybe the field was changed
       LOG.warn("Could not load form XML [{}]", getClass().getName(), e);
-      result.addFieldWithInvalidValue(this, null, rawValue);
+      result.notifyError();
     }
     return result;
   }

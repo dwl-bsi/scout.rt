@@ -444,8 +444,12 @@ public abstract class AbstractComposerField extends AbstractFormField implements
       //
       getTree().removeAllChildNodes(getTree().getRootNode());
       if (!loadXMLRec(x, getTree().getRootNode())) {
-        result.addFieldWithInvalidValue(this, null, null);
+        result.notifyError();
       }
+    }
+    catch (Exception e) {
+      result.notifyError();
+      throw e;
     }
     finally {
       tree.setTreeChanging(false);

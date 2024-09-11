@@ -1314,12 +1314,11 @@ public abstract class AbstractFormField extends AbstractWidget implements IFormF
     try {
       Document doc = XmlUtility.getXmlDocument(xml);
       Element root = doc.getDocumentElement();
-      result.combineWith(null, loadFromXml(root));
+      return loadFromXml(root);
     }
     catch (Exception e) {
       throw new ProcessingException("Error in AbstractFormField.setXML: ", e);
     }
-    return result;
   }
 
   @Override

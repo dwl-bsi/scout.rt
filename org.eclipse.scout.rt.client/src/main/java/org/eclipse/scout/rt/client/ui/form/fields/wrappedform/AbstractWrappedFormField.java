@@ -262,7 +262,7 @@ public abstract class AbstractWrappedFormField<FORM extends IForm> extends Abstr
   public FormXmlLoaderResult loadFromXml(Element x) {
     FormXmlLoaderResult result = super.loadFromXml(x);
     if (getInnerForm() != null) {
-      result.combineWith(null, getInnerForm().loadFromXml(x));
+      result.notifyError();
     }
     return result;
   }

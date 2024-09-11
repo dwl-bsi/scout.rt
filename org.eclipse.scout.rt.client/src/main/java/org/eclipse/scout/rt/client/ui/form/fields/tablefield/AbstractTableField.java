@@ -323,7 +323,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
       }
     }
     if (!success) {
-      result.addFieldWithInvalidValue(this);
+      result.notifyError();
     }
     return result;
   }

@@ -108,6 +108,7 @@ public final class BeanUtility {
             writeMethod.invoke(to, new Object[]{TypeCastUtility.castValue(value, writeMethod.getParameterTypes()[0])});
           }
         }
+        // TODO dwl: unbekannte property abfangen?
       }
       catch (Exception e) {
         if (propertyErrorHandler != null) {
